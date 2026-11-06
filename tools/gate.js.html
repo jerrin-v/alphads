@@ -1,0 +1,52 @@
+<script id="adsPayload" type="application/json">/*PAYLOAD*/</script>
+<style>html.ads-wait .card{visibility:hidden}</style>
+<script>
+/* GitHub Pages sign-in. The page and its data are AES-256-GCM encrypted with a key derived from the
+   password (PBKDF2-SHA256), so nothing readable is served until the right password is entered.
+   A sign-in lasts for this tab (sessionStorage); "Remember me for today" keeps it until local midnight.
+   Add ?signout to the address to sign out. A new build (new salt or password) signs everyone out. */
+(function(){
+  var P=JSON.parse(document.getElementById("adsPayload").textContent);
+  var root=document.documentElement, SK="ads_gh_key", RK="ads_gh_rem";
+  var f=document.getElementById("f"), pw=document.getElementById("pw"), fw=document.getElementById("fw"),
+      msg=document.getElementById("msg"), go=document.getElementById("go"), rem=document.getElementById("rem");
+  function say(t){msg.textContent=t;if(fw)fw.classList.toggle("err",!!t);pw.setAttribute("aria-invalid",t?"true":"false")}
+  function ub(s){var b=atob(s),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a}
+  function b64(a){var s="";for(var i=0;i<a.length;i++)s+=String.fromCharCode(a[i]);return btoa(s)}
+  function midnight(){var d=new Date();d.setHours(24,0,0,0);return d.getTime()}
+  function forget(){try{sessionStorage.removeItem(SK);localStorage.removeItem(RK)}catch(e){}}
+  function stored(){try{var s=sessionStorage.getItem(SK);if(s){s=JSON.parse(s);if(s.s===P.s)return s.k}
+    var r=localStorage.getItem(RK);if(r){r=JSON.parse(r);if(r.s===P.s&&r.e>Date.now())return r.k;localStorage.removeItem(RK)}}catch(e){}return null}
+  function keep(k,remember){try{sessionStorage.setItem(SK,JSON.stringify({s:P.s,k:k}));if(remember)localStorage.setItem(RK,JSON.stringify({s:P.s,k:k,e:midnight()}))}catch(e){}}
+  async function derive(p){var base=await crypto.subtle.importKey("raw",new TextEncoder().encode(p),"PBKDF2",false,["deriveBits"]);
+    return new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",salt:ub(P.s),iterations:P.i,hash:"SHA-256"},base,256))}
+  async function open(raw){var key=await crypto.subtle.importKey("raw",raw,"AES-GCM",false,["decrypt"]),d=ub(P.d);
+    return new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:d.slice(0,12)},key,d.slice(12)))}
+  // Runs first inside the decrypted page: JSON data files are fetched as <name>.json.enc and decrypted with the same key.
+  function boot(k){return "<script>(function(){var k='"+k+"',K=null,of=window.fetch.bind(window);"+
+    "function ub(s){var b=atob(s),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a}"+
+    "function key(){return K||(K=crypto.subtle.importKey('raw',ub(k),'AES-GCM',false,['decrypt']))}"+
+    "window.fetch=function(u,o){var s=typeof u==='string'?u:(u&&u.url)||String(u),x;try{x=new URL(s,location.href)}catch(e){return of(u,o)}"+
+    "if(x.origin!==location.origin||!/\\.json$/.test(x.pathname))return of(u,o);"+
+    "return of(x.href.split('#')[0]+'.enc',o).then(function(r){if(!r.ok)return r;return r.arrayBuffer().then(function(b){var a=new Uint8Array(b);"+
+    "return key().then(function(K){return crypto.subtle.decrypt({name:'AES-GCM',iv:a.slice(0,12)},K,a.slice(12))}).then(function(p){return new Response(p,{status:200,headers:{'Content-Type':'application/json'}})})})})};})();<\/script>"}
+  function show(html,k){var m=/<head[^>]*>/i.exec(html),b=boot(k);html=m?html.slice(0,m.index+m[0].length)+b+html.slice(m.index+m[0].length):b+html;
+    document.open();document.write(html);document.close()}
+  if(/[?&]signout\b/.test(location.search)){forget();history.replaceState(null,"",location.pathname+location.hash)}
+  var k0=stored();
+  if(k0){root.classList.add("ads-wait");
+    // Swap the page in only after the sign-in page has finished loading (document.open is ignored while it is still parsing).
+    var ready=new Promise(function(r){if(document.readyState==="complete")r();else addEventListener("load",function(){r()})});
+    Promise.all([open(ub(k0)),ready]).then(function(x){setTimeout(function(){show(x[0],k0)},0)},function(){forget();root.classList.remove("ads-wait")})}
+  // Take over the form before login.html's own server sign-in handler sees it.
+  document.addEventListener("submit",async function(e){
+    if(e.target!==f)return; e.preventDefault(); e.stopImmediatePropagation();
+    var v=pw.value.trim(); if(!v){say("Enter the password.");pw.focus();return}
+    if(!(window.crypto&&crypto.subtle)){say("This browser can't open the site. Use an up-to-date browser over HTTPS.");return}
+    go.disabled=true;go.textContent="Checking…";
+    try{var raw=await derive(v),h=await open(raw),k=b64(raw);keep(k,rem&&rem.checked);show(h,k);return}
+    catch(err){say("That password isn't right. Try again.");pw.select()}
+    go.disabled=false;go.textContent="Continue";
+  },true);
+})();
+</script>

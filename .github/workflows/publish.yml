@@ -1,0 +1,75 @@
+# Publishes the password-protected Alpha DS site to GitHub Pages.
+#
+# The repo holds only the encrypted backup (backup/alpha-ds-site.tar.gz.age). This workflow:
+#   1. unlocks it with the SITE_BACKUP_KEY secret,
+#   2. encrypts the page and its data with the SITE_PASSWORD secret (tools/encrypt-site.mjs),
+#   3. publishes the result to GitHub Pages.
+# Both secrets live in Settings → Secrets and variables → Actions. Neither is ever printed.
+# Runs on every push of a new backup, and by hand from Actions → Publish site → Run workflow
+# (use that after changing the password).
+name: Publish site
+
+on:
+  push:
+    branches: [main]
+    paths: ['backup/**', 'tools/**', '.github/workflows/publish.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the secrets
+        env:
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+          SITE_BACKUP_KEY: ${{ secrets.SITE_BACKUP_KEY }}
+        run: |
+          if [ -z "$SITE_BACKUP_KEY" ]; then echo "::error::SITE_BACKUP_KEY is not set. Add it in Settings > Secrets and variables > Actions."; exit 1; fi
+          if [ ${#SITE_PASSWORD} -lt 8 ]; then echo "::error::SITE_PASSWORD is missing or shorter than 8 characters. Set it in Settings > Secrets and variables > Actions."; exit 1; fi
+          echo "Secrets are set."
+
+      - name: Install age
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age >/dev/null
+
+      - name: Unlock the backup
+        env:
+          SITE_BACKUP_KEY: ${{ secrets.SITE_BACKUP_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$SITE_BACKUP_KEY" > "$RUNNER_TEMP/backup-key.txt"
+          mkdir -p "$RUNNER_TEMP/site"
+          age -d -i "$RUNNER_TEMP/backup-key.txt" backup/alpha-ds-site.tar.gz.age | tar -xz -C "$RUNNER_TEMP/site"
+          rm -f "$RUNNER_TEMP/backup-key.txt"
+          echo "Unlocked $(cat backup/BUILD.txt | head -1)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Encrypt the site with the password
+        env:
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+        run: node tools/encrypt-site.mjs "$RUNNER_TEMP/site" _site && rm -rf "$RUNNER_TEMP/site"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
