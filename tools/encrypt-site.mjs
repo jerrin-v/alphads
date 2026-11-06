@@ -44,7 +44,7 @@ const end = gate.lastIndexOf('</body>');
 gate = gate.slice(0, end) + g + '\n' + gate.slice(end);
 gate = gate.replace(/<head>/i, '<head>\n<meta name="robots" content="noindex, nofollow">');
 // Footer "Published" stamp = the moment this GitHub build runs (UAE time, UTC+4).
-const uae = new Date(Date.now() + 4 * 3600e3), M = ['January','February','March','April','May','June','July','August','September','October','November','December'], z = n => String(n).padStart(2, '0');
+const uae = new Date(Date.now() + 4 * 3600e3), M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], z = n => String(n).padStart(2, '0');
 gate = gate.replace(/<time data-ds="published" datetime="[^"]*">[^<]*<\/time>/, `<time data-ds="published" datetime="${uae.toISOString().slice(0, 19)}+04:00">${z(uae.getUTCDate())} ${M[uae.getUTCMonth()]} ${uae.getUTCFullYear()}, ${z(uae.getUTCHours())}:${z(uae.getUTCMinutes())} UAE</time>`);
 writeFileSync(join(out, 'index.html'), gate);
 
