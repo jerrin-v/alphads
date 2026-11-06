@@ -31,7 +31,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check the secrets
         env:
@@ -56,9 +56,9 @@ jobs:
           rm -f "$RUNNER_TEMP/backup-key.txt"
           echo "Unlocked $(cat backup/BUILD.txt | head -1)"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Encrypt the site with the password
         env:
