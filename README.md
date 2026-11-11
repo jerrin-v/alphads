@@ -9,7 +9,7 @@ This repo holds the site only in sealed form (`backup/alpha-ds-site.tar.gz.age`)
 <!-- PUSH-LOG:START -->
 | # | Pushed (UAE time, UTC+4) | Commit | What changed | Site |
 |---|---|---|---|---|
-| 1 | Wed 11 Nov 2026, 17:00:04 | [`9ff5983`](https://github.com/jerrin-v/alphads/commit/9ff5983ac8a31561bde973311351912b11479f99) | Site backup v1.59.04 from GitLab 1274c1a | ⏳ Publishing |
+| 1 | Wed 11 Nov 2026, 17:00:04 | [`9ff5983`](https://github.com/jerrin-v/alphads/commit/9ff5983ac8a31561bde973311351912b11479f99) | Site backup v1.59.04 from GitLab 1274c1a | ✅ Published |
 | 2 | Mon 09 Nov 2026, 15:48:52 | [`5babc85`](https://github.com/jerrin-v/alphads/commit/5babc85db321d0b2ac16a330e60da01f60dc5634) | Site backup v1.59.04 from GitLab abff2b6 | ✅ Published |
 | 3 | Fri 06 Nov 2026, 18:40:07 | [`0eae3ac`](https://github.com/jerrin-v/alphads/commit/0eae3ac20d334b5d16b44081b8c44b51fde72faf) | Show the last 3 pushes in the README | No site change |
 <!-- PUSH-LOG:END -->
