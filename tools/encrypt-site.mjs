@@ -5,7 +5,9 @@
 // The page (index.html) and every JSON data file are encrypted with AES-256-GCM. The key comes from
 // SITE_PASSWORD through PBKDF2-SHA256 (600 000 rounds) with a fresh random salt on every build, so a new
 // build (or a new password) signs everyone out. The sign-in page is the site's own login.html with its
-// server check replaced by an in-browser decrypt. Images, fonts, cover.webp and logo.webp stay as plain files.
+// server check replaced by an in-browser decrypt. The graph images are encrypted too (<name>.webp.enc) and decrypted
+// in the browser as they scroll into view. Only what the sign-in page itself shows stays plain: cover.webp, logo.webp
+// and the open-licence fonts in plugins/fonts/.
 // The password is read from the environment only and is never printed or written to disk.
 import { createCipheriv, pbkdf2Sync, randomBytes } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -23,7 +25,7 @@ const enc = buf => { const iv = randomBytes(12); const c = createCipheriv('aes-2
 
 // 1. Copy only what the site serves (no server auth, Dockerfile, CI files or the server sign-in page).
 rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
-for (const f of ['index.html', 'vars.json', 'cover.webp', 'logo.webp', 'plugins', 'graphs', 'icons']) {
+for (const f of ['index.html', 'vars.json', 'snippets.json', 'cover.webp', 'logo.webp', 'plugins', 'graphs', 'icons']) {
   if (existsSync(join(src, f))) cpSync(join(src, f), join(out, f), { recursive: true });
 }
 
@@ -32,10 +34,23 @@ let nJson = 0;
 const walk = d => { for (const n of readdirSync(d)) { const p = join(d, n); if (statSync(p).isDirectory()) walk(p); else if (n.endsWith('.json')) { writeFileSync(p + '.enc', enc(readFileSync(p))); rmSync(p); nJson++; } } };
 walk(out);
 
+// 2b. Encrypt the graph images. The page asks for them through data-esrc (rewritten below) and decrypts them on demand.
+let nImg = 0;
+const gdir = join(out, 'graphs');
+if (existsSync(gdir)) for (const n of readdirSync(gdir)) { const p = join(gdir, n); if (/\.webp$/i.test(n)) { writeFileSync(p + '.enc', enc(readFileSync(p))); rmSync(p); nImg++; } }
+
 // 3. Encrypt the page and wrap it in the sign-in page.
-const page = enc(readFileSync(join(src, 'index.html')));
+let html = readFileSync(join(src, 'index.html'), 'utf8');
+const nRef = (html.match(/src="graphs\//g) || []).length;
+if (nImg && !nRef) { console.error('index.html no longer loads graphs/ images with src="graphs/…"; update encrypt-site.mjs.'); process.exit(1); }
+html = html.replace(/src="graphs\//g, 'data-esrc="graphs/');
+// The site's CSP meta tag lists hashes of its own inline scripts. The decrypt scripts added here are not in it, so drop it
+// (GitHub Pages sends no CSP header; the page and data stay protected by the encryption).
+const noCsp = t => t.replace(/\n?<meta http-equiv="Content-Security-Policy"[^>]*>/i, '');
+html = noCsp(html);
+const page = enc(Buffer.from(html, 'utf8'));
 const payload = { s: salt.toString('base64'), i: ITER, d: page.toString('base64') };
-let gate = readFileSync(join(src, 'login.html'), 'utf8');
+let gate = noCsp(readFileSync(join(src, 'login.html'), 'utf8'));
 if (!gate.includes('id="f"') || !gate.includes('id="pw"') || !gate.includes('</body>')) { console.error('login.html does not have the expected sign-in form.'); process.exit(1); }
 // The gate script runs after login.html's own script and takes over the form submit (capture phase),
 // so the theme, density and show-password controls keep working unchanged.
@@ -51,4 +66,4 @@ writeFileSync(join(out, 'index.html'), gate);
 // 4. Pages extras: no Jekyll processing, no search indexing.
 writeFileSync(join(out, '.nojekyll'), '');
 writeFileSync(join(out, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
-console.log(`Encrypted the page and ${nJson} data files into ${out}`);
+console.log(`Encrypted the page, ${nJson} data files and ${nImg} images into ${out}`);
